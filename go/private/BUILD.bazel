@@ -180,3 +180,18 @@ config_setting(
         ":request_nogo": "True",
     },
 )
+
+bool_setting(
+    name = "always_true",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+# Only used by //:go_config.
+config_setting(
+    name = "is_compilation_mode_dbg",
+    values = {
+        "compilation_mode": "dbg",
+    },
+    visibility = ["//:__pkg__"],
+)

@@ -78,7 +78,7 @@ or using `Bazel configuration transitions`_.
 | :param:`debug`    | :type:`bool`        | :value:`false`                     |
 +-------------------+---------------------+------------------------------------+
 | Includes debugging information in compiled packages (using the ``-N`` and    |
-| ``-l`` flags).                                                               |
+| ``-l`` flags). This is always true with ``-c dbg``.                          |
 +-------------------+---------------------+------------------------------------+
 | :param:`gotags`   | :type:`string_list` | :value:`[]`                        |
 +-------------------+---------------------+------------------------------------+
