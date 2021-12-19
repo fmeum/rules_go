@@ -33,10 +33,6 @@ load(
     "GoSource",
 )
 load(
-    "@io_bazel_rules_go_name_hack//:def.bzl",
-    "IS_RULES_GO",
-)
-load(
     "@io_bazel_rules_go//go/platform:crosstool.bzl",
     "platform_from_crosstool",
 )
@@ -44,21 +40,19 @@ load(
 def filter_transition_label(label):
     """Transforms transition labels for the current workspace.
 
-    This is a workaround for bazelbuild/bazel#10499. If a transition refers to
-    a build setting in the same workspace, for example
-    @io_bazel_rules_go//go/config:goos, it must use a label without a workspace
-    name if and only if the workspace is the main workspace.
-
-    All Go build settings and transitions are in io_bazel_rules_go. So if
-    io_bazel_rules_go is the main workspace (for development and testing),
-    go_transition must use a label like //go/config:goos. If io_bazel_rules_go
-    is not the main workspace (almost always), go_transition must use a label
-    like @io_bazel_rules_go//go/config:goos.
+    This works around bazelbuild/bazel#10499 by automatically using the correct
+    way to refer to this repository (@io_bazel_rules_go from another workspace,
+    but only repo-relative labels if this repository is the main workspace).
     """
-    if IS_RULES_GO and label.startswith("@io_bazel_rules_go"):
-        return label[len("@io_bazel_rules_go"):]
-    else:
+    if label.startswith("//command_line_option:"):
+        # This is a special prefix that allows transitions to access the values
+        # of native command-line flags. It is not a valid package, but just a
+        # syntactic prefix that is consumed by the transition logic, and thus
+        # must not be passed through the Label constructor.
+        # https://cs.opensource.google/bazel/bazel/+/master:src/main/java/com/google/devtools/build/lib/analysis/config/StarlarkDefinedConfigTransition.java;l=62;drc=463e8c80cd11d36777ddf80543aea7c53293f298
         return label
+    else:
+        return str(Label(label))
 
 def go_transition_wrapper(kind, transition_kind, name, **kwargs):
     """Wrapper for rules that may use transitions.
