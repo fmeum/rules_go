@@ -125,9 +125,10 @@ _go_download_sdk = repository_rule(
     },
 )
 
-def go_download_sdk(name, **kwargs):
+def go_download_sdk(name, register = True, **kwargs):
     _go_download_sdk(name = name, **kwargs)
-    _register_toolchains(name)
+    if register:
+        _register_toolchains(name)
 
 def _go_local_sdk_impl(ctx):
     goroot = ctx.attr.path
