@@ -14,8 +14,6 @@
 
 # Once nested repositories work, this file should cease to exist.
 
-load("//go/private:common.bzl", "MINIMUM_BAZEL_VERSION")
-load("//go/private/skylib/lib:versions.bzl", "versions")
 load("//go/private:nogo.bzl", "DEFAULT_NOGO", "go_register_nogo")
 load("//proto:gogo.bzl", "gogo_special_proto")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
@@ -35,40 +33,6 @@ def go_rules_dependencies():
     for information on choosing different versions of these repositories
     in your own project.
     """
-    if getattr(native, "bazel_version", None):
-        versions.check(MINIMUM_BAZEL_VERSION, bazel_version = native.bazel_version)
-
-    # Repository of standard constraint settings and values.
-    # Bazel declares this automatically after 0.28.0, but it's better to
-    # define an explicit version.
-    # releaser:upgrade-dep bazelbuild platforms
-    _maybe(
-        http_archive,
-        name = "platforms",
-        # 0.0.4, latest as of 2021-10-06
-        urls = [
-            "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.4/platforms-0.0.4.tar.gz",
-            "https://github.com/bazelbuild/platforms/releases/download/0.0.4/platforms-0.0.4.tar.gz",
-        ],
-        sha256 = "079945598e4b6cc075846f7fd6a9d0857c33a7afc0de868c2ccb96405225135d",
-        strip_prefix = "",
-    )
-
-    # Needed by rules_go implementation and tests.
-    # We can't call bazel_skylib_workspace from here. At the moment, it's only
-    # used to register unittest toolchains, which rules_go does not need.
-    # releaser:upgrade-dep bazelbuild bazel-skylib
-    _maybe(
-        http_archive,
-        name = "bazel_skylib",
-        # 1.1.1, latest as of 2021-10-06
-        urls = [
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.1.1/bazel-skylib-1.1.1.tar.gz",
-            "https://github.com/bazelbuild/bazel-skylib/releases/download/1.1.1/bazel-skylib-1.1.1.tar.gz",
-        ],
-        sha256 = "c6966ec828da198c5d9adbaa94c05e3a1c7f21bd012a0b29ba8ddbccb2c93b0d",
-        strip_prefix = "",
-    )
 
     # Needed for nogo vet checks and go/packages.
     # releaser:upgrade-dep golang tools
@@ -286,5 +250,11 @@ def go_rules_dependencies():
     )
 
 def _maybe(repo_rule, name, **kwargs):
-    if name not in native.existing_rules():
-        repo_rule(name = name, **kwargs)
+    repo_rule(name = name, **kwargs)
+
+def _install_go_rules_dependencies_impl(ctx):
+    go_rules_dependencies()
+
+install_go_rules_dependencies = module_extension(
+    implementation = _install_go_rules_dependencies_impl,
+)
