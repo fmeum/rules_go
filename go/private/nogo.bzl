@@ -15,6 +15,7 @@
 DEFAULT_NOGO = str(Label("//:default_nogo"))
 
 def _go_register_nogo_impl(ctx):
+    print(DEFAULT_NOGO)
     ctx.template(
         "BUILD.bazel",
         Label("//go/private:BUILD.nogo.bazel"),
@@ -33,4 +34,5 @@ go_register_nogo = repository_rule(
     attrs = {
         "nogo": attr.string(mandatory = True),
     },
+    local = True,
 )

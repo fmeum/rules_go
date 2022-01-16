@@ -288,3 +288,10 @@ def go_rules_dependencies():
 def _maybe(repo_rule, name, **kwargs):
     if name not in native.existing_rules():
         repo_rule(name = name, **kwargs)
+
+def _go_dependencies_impl(ctx):
+    go_rules_dependencies()
+
+go_dependencies = module_extension(
+    implementation = _go_dependencies_impl,
+)
