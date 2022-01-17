@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-DEFAULT_NOGO = str(Label("//:default_nogo"))
+DEFAULT_NOGO = "@io_bazel_rules_go//:default_nogo"
 
 def _go_register_nogo_impl(ctx):
     ctx.template(
