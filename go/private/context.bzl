@@ -477,6 +477,7 @@ def go_context(ctx, attr = None):
         tags = tags,
         stamp = mode.stamp,
         label = ctx.label,
+        cover_format = mode.cover_format,
 
         # Action generators
         archive = toolchain.actions.archive,
@@ -781,6 +782,7 @@ def _go_config_impl(ctx):
         linkmode = ctx.attr.linkmode[BuildSettingInfo].value,
         tags = ctx.attr.gotags[BuildSettingInfo].value,
         stamp = ctx.attr.stamp,
+        cover_format = ctx.attr.cover_format[BuildSettingInfo].value,
     )]
 
 go_config = rule(
@@ -819,6 +821,10 @@ go_config = rule(
             providers = [BuildSettingInfo],
         ),
         "stamp": attr.bool(mandatory = True),
+        "cover_format": attr.label(
+            mandatory = True,
+            providers = [BuildSettingInfo],
+        ),
     },
     provides = [GoConfigInfo],
     doc = """Collects information about build settings in the current

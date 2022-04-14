@@ -101,6 +101,7 @@ def _go_test_impl(ctx):
             arguments.add("-cover_mode", "atomic")
         else:
             arguments.add("-cover_mode", "set")
+        arguments.add("-cover_format", go.cover_format)
     arguments.add(
         # the l is the alias for the package under test, the l_test must be the
         # same with the test suffix

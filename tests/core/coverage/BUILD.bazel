@@ -10,3 +10,12 @@ go_bazel_test(
     name = "binary_coverage_test",
     srcs = ["binary_coverage_test.go"],
 )
+
+go_bazel_test(
+    name = "lcov_coverage_test",
+    srcs = ["lcov_coverage_test.go"],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)

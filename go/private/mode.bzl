@@ -76,6 +76,7 @@ def get_mode(ctx, go_toolchain, cgo_context_info, go_config_info):
     stamp = go_config_info.stamp if go_config_info else False
     debug = go_config_info.debug if go_config_info else False
     linkmode = go_config_info.linkmode if go_config_info else LINKMODE_NORMAL
+    cover_format = go_config_info and go_config_info.cover_format
     goos = go_toolchain.default_goos
     goarch = go_toolchain.default_goarch
 
@@ -107,6 +108,7 @@ def get_mode(ctx, go_toolchain, cgo_context_info, go_config_info):
         goos = goos,
         goarch = goarch,
         tags = tags,
+        cover_format = cover_format,
     )
 
 def installsuffix(mode):

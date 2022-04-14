@@ -46,6 +46,7 @@ func compilePkg(args []string) error {
 	var outPath, outFactsPath, cgoExportHPath string
 	var testFilter string
 	var gcFlags, asmFlags, cppFlags, cFlags, cxxFlags, objcFlags, objcxxFlags, ldFlags quoteMultiFlag
+	var coverFormat string
 	fs.Var(&unfilteredSrcs, "src", ".go, .c, .cc, .m, .mm, .s, or .S file to be filtered and compiled")
 	fs.Var(&coverSrcs, "cover", ".go file that should be instrumented for coverage (must also be a -src)")
 	fs.Var(&embedSrcs, "embedsrc", "file that may be compiled into the package with a //go:embed directive")
@@ -67,6 +68,7 @@ func compilePkg(args []string) error {
 	fs.StringVar(&outFactsPath, "x", "", "The output archive file to write export data and nogo facts")
 	fs.StringVar(&cgoExportHPath, "cgoexport", "", "The _cgo_exports.h file to write")
 	fs.StringVar(&testFilter, "testfilter", "off", "Controls test package filtering")
+	fs.StringVar(&coverFormat, "cover_format", "", "Emit source file paths in coverage instrumentation suitable for the specified coverage format")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -84,9 +86,6 @@ func compilePkg(args []string) error {
 	}
 	for i := range embedSrcs {
 		embedSrcs[i] = abs(embedSrcs[i])
-	}
-	for i := range coverSrcs {
-		coverSrcs[i] = abs(coverSrcs[i])
 	}
 
 	// Filter sources.
@@ -143,7 +142,8 @@ func compilePkg(args []string) error {
 		packageListPath,
 		outPath,
 		outFactsPath,
-		cgoExportHPath)
+		cgoExportHPath,
+		coverFormat)
 }
 
 func compileArchive(
@@ -169,7 +169,8 @@ func compileArchive(
 	packageListPath string,
 	outPath string,
 	outXPath string,
-	cgoExportHPath string) error {
+	cgoExportHPath string,
+	coverFormat string) error {
 
 	workDir, cleanup, err := goenv.workDir()
 	if err != nil {
@@ -232,9 +233,9 @@ func compileArchive(
 
 	// Instrument source files for coverage.
 	if coverMode != "" {
-		shouldCover := make(map[string]bool)
+		relCoverPath := make(map[string]string)
 		for _, s := range coverSrcs {
-			shouldCover[s] = true
+			relCoverPath[abs(s)] = s
 		}
 
 		combined := append([]string{}, goSrcs...)
@@ -242,13 +243,23 @@ func compileArchive(
 			combined = append(combined, cgoSrcs...)
 		}
 		for i, origSrc := range combined {
-			if !shouldCover[origSrc] {
+			if _, ok := relCoverPath[origSrc]; !ok {
 				continue
 			}
 
-			srcName := origSrc
-			if importPath != "" {
-				srcName = path.Join(importPath, filepath.Base(origSrc))
+			var srcName string
+			switch coverFormat {
+			case "go_cover":
+				srcName = origSrc
+				if importPath != "" {
+					srcName = path.Join(importPath, filepath.Base(origSrc))
+				}
+			case "lcov":
+				// Bazel merges lcov reports across languages and thus assumes
+				// that the source file paths are relative to the exec root.
+				srcName = relCoverPath[origSrc]
+			default:
+				return fmt.Errorf("invalid value for -cover_format: %q", coverFormat)
 			}
 
 			stem := filepath.Base(origSrc)

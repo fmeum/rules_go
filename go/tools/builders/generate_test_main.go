@@ -70,6 +70,7 @@ type Cases struct {
 	Examples    []Example
 	TestMain    string
 	CoverMode   string
+	CoverFormat string
 	Pkgname     string
 }
 
@@ -194,18 +195,29 @@ func main() {
 		})
 
 		if coverageDat, ok := os.LookupEnv("COVERAGE_OUTPUT_FILE"); ok {
+			{{if eq .CoverFormat "lcov"}}
+			flag.Lookup("test.coverprofile").Value.Set(coverageDat+".cover")
+			{{else}}
 			flag.Lookup("test.coverprofile").Value.Set(coverageDat)
+			{{end}}
 		}
 	}
 	{{end}}
 
 	{{if not .TestMain}}
-	os.Exit(m.Run())
+	res := m.Run()
 	{{else}}
 	{{.TestMain}}(m)
 	{{/* See golang.org/issue/34129 and golang.org/cl/219639 */}}
-	os.Exit(int(reflect.ValueOf(m).Elem().FieldByName("exitCode").Int()))
+	res := int(reflect.ValueOf(m).Elem().FieldByName("exitCode").Int())
 	{{end}}
+	{{if and (ne .CoverMode "") (eq .CoverFormat "lcov")}}
+	if err := bzltestutil.ConvertCoverToLcov(); err != nil {
+		log.Print(err)
+		os.Exit(bzltestutil.TestWrapperAbnormalExit)
+	}
+	{{end}}
+	os.Exit(res)
 }
 `
 
@@ -221,6 +233,7 @@ func genTestMain(args []string) error {
 	goenv := envFlags(flags)
 	out := flags.String("output", "", "output file to write. Defaults to stdout.")
 	coverMode := flags.String("cover_mode", "", "the coverage mode to use")
+	coverFormat := flags.String("cover_format", "", "the coverage report type to generate (go_cover or lcov)")
 	pkgname := flags.String("pkgname", "", "package name of test")
 	flags.Var(&imports, "import", "Packages to import")
 	flags.Var(&sources, "src", "Sources to process for tests")
@@ -270,8 +283,9 @@ func genTestMain(args []string) error {
 	}
 
 	cases := Cases{
-		CoverMode: *coverMode,
-		Pkgname:   *pkgname,
+		CoverFormat: *coverFormat,
+		CoverMode:   *coverMode,
+		Pkgname:     *pkgname,
 	}
 
 	testFileSet := token.NewFileSet()
