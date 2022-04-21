@@ -19,3 +19,12 @@ go_bazel_test(
         "//conditions:default": [],
     }),
 )
+
+go_bazel_test(
+    name = "lcov_test_main_coverage_test",
+    srcs = ["lcov_test_main_coverage_test.go"],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
