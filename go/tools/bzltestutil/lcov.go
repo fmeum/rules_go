@@ -19,12 +19,20 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 )
+
+func coverageAtExitHook() {
+	if err := ConvertCoverToLcov(); err != nil {
+		log.Printf("Failed to collect coverage: %s", err)
+		os.Exit(TestWrapperAbnormalExit)
+	}
+}
 
 // ConvertCoverToLcov converts the go coverprofile file coverage.dat.cover to
 // the expectedLcov format and stores it in coverage.dat, where it is picked up by
@@ -41,6 +49,7 @@ func ConvertCoverToLcov() error {
 	in, err := os.Open(inPath)
 	if err != nil {
 		// This can happen if there are no tests and should not be an error.
+		log.Printf("Not collecting coverage: %s has not been created: %s", inPath, err)
 		return nil
 	}
 	defer in.Close()
@@ -145,4 +154,31 @@ func emitLcovLines(lcov io.StringWriter, path string, lineCounts map[uint32]uint
 		return err
 	}
 	return nil
+}
+
+// PatchTestDeps returns a patched version of testdeps.testDeps that allows to
+// hook into the SetPanicOnExit0 call happening right before testing.M.Run
+// returns.
+// This trick relies on the testDeps interface defined in this package being
+// identical to the actual testing.testDeps interface, which differs between
+// major versions of Go.
+func PatchTestDeps(doPatch bool, deps testDeps) testDeps {
+	if doPatch {
+		return FakeTestDeps{deps}
+	} else {
+		return deps
+	}
+}
+
+type FakeTestDeps struct{
+	testDeps
+}
+
+// SetPanicOnExit0 is called with argument `true` by the Go testing package
+// after the coverage profile has been written and before m.Run() returns.
+func (ftd FakeTestDeps) SetPanicOnExit0(panicOnExit bool) {
+	if !panicOnExit {
+		coverageAtExitHook()
+	}
+	ftd.testDeps.SetPanicOnExit0(panicOnExit)
 }

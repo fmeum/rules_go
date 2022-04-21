@@ -163,7 +163,6 @@ This runs tests from the repository `golang.org/x/tools <https://golang.org/x/to
 * @org_golang_x_tools//cmd/splitdwarf/internal/macho:macho_test
 * @org_golang_x_tools//cover:cover_test
 * @org_golang_x_tools//go/analysis:analysis_test
-* @org_golang_x_tools//go/analysis/internal/analysisflags:analysisflags_test
 * @org_golang_x_tools//go/analysis/passes/internal/analysisutil:analysisutil_test
 * @org_golang_x_tools//go/analysis/passes/usesgenerics:usesgenerics_test
 * @org_golang_x_tools//go/ast/astutil:astutil_test

@@ -98,6 +98,7 @@ POPULAR_REPOS = [
             "container/intsets:intsets_test", # TODO(#413): External test depends on symbols defined in internal test.
             "copyright:copyright_test", # # requires runfiles
             "go/analysis/analysistest:analysistest_test", # requires build cache
+            "go/analysis/internal/analysisflags:analysisflags_test", # calls os.Exit(0) in a test
             "go/analysis/internal/checker:checker_test", # loads test package with go/packages, which probably needs go list
             "go/analysis/internal/facts:facts_test", # loads test package with go/packages, which probably needs go list
             "go/analysis/multichecker:multichecker_test", # requires go vet

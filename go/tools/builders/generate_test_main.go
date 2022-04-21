@@ -172,10 +172,15 @@ func main() {
 		}
 	}
 
-  {{if .Version "go1.18"}}
-	m := testing.MainStart(testdeps.TestDeps{}, testsInShard(), benchmarks, fuzzTargets, examples)
+  {{if eq .CoverFormat "lcov"}}
+	doPatch := true
   {{else}}
-	m := testing.MainStart(testdeps.TestDeps{}, testsInShard(), benchmarks, examples)
+	doPatch := false
+  {{end}}
+  {{if .Version "go1.18"}}
+	m := testing.MainStart(bzltestutil.PatchTestDeps(doPatch, testdeps.TestDeps{}), testsInShard(), benchmarks, fuzzTargets, examples)
+  {{else}}
+	m := testing.MainStart(bzltestutil.PatchTestDeps(doPatch, testdeps.TestDeps{}), testsInShard(), benchmarks, examples)
   {{end}}
 
 	if filter := os.Getenv("TESTBRIDGE_TEST_ONLY"); filter != "" {
@@ -185,6 +190,11 @@ func main() {
 	if failfast := os.Getenv("TESTBRIDGE_TEST_RUNNER_FAIL_FAST"); failfast != "" {
 		flag.Lookup("test.failfast").Value.Set("true")
 	}
+
+	// Setting this flag serves two purposes:
+	// 1. It attains parity with "go test", which enables this feature by default.
+	// 2. It provides a way to run hooks right before testing.M.Run() returns.
+	flag.Lookup("test.paniconexit0").Value.Set("true")
 
 	{{if ne .CoverMode ""}}
 	if len(coverdata.Counters) > 0 {
@@ -210,12 +220,6 @@ func main() {
 	{{.TestMain}}(m)
 	{{/* See golang.org/issue/34129 and golang.org/cl/219639 */}}
 	res := int(reflect.ValueOf(m).Elem().FieldByName("exitCode").Int())
-	{{end}}
-	{{if and (ne .CoverMode "") (eq .CoverFormat "lcov")}}
-	if err := bzltestutil.ConvertCoverToLcov(); err != nil {
-		log.Print(err)
-		os.Exit(bzltestutil.TestWrapperAbnormalExit)
-	}
 	{{end}}
 	os.Exit(res)
 }
