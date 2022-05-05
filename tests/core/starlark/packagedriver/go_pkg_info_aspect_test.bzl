@@ -1,6 +1,5 @@
-load("@bazel_skylib//lib:unittest.bzl", "asserts", "analysistest")
+load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("//go/tools/gopackagesdriver:aspect.bzl", "go_pkg_info_aspect")
-
 
 def _package_driver_pkg_json_test_impl(ctx):
     env = analysistest.begin(ctx)

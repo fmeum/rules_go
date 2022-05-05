@@ -6,4 +6,3 @@ go_library(
     importpath = "example.com/a",
     visibility = ["//tests/core/starlark/packagedriver:__subpackages__"],
 )
-

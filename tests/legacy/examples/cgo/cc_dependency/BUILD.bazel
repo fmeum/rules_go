@@ -19,7 +19,10 @@ cc_library(
 
 cc_binary(
     name = "c_version_so",
-    srcs = ["c_version.c", "c_version.h"],
+    srcs = [
+        "c_version.c",
+        "c_version.h",
+    ],
     linkshared = True,
 )
 
