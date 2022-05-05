@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//go:def.bzl", "go_context")
 load("//go/private:providers.bzl", "GoStdLib")
 
 def _pure_transition_impl(settings, attr):

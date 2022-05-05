@@ -230,8 +230,8 @@ def _gomock_reflect(name, library, out, mockgen_tool, **kwargs):
 
 def _gomock_prog_gen_impl(ctx):
     args = ["-prog_only"]
-    args += [ctx.attr.library[GoLibrary].importpath]
-    args += [",".join(ctx.attr.interfaces)]
+    args.append(ctx.attr.library[GoLibrary].importpath)
+    args.append(",".join(ctx.attr.interfaces))
 
     cmd = ctx.file.mockgen_tool
     out = ctx.outputs.out
@@ -286,8 +286,8 @@ def _gomock_prog_exec_impl(ctx):
 
     # annoyingly, the interfaces join has to go after the importpath so we can't
     # share those.
-    args += [ctx.attr.library[GoLibrary].importpath]
-    args += [",".join(ctx.attr.interfaces)]
+    args.append(ctx.attr.library[GoLibrary].importpath)
+    args.append(",".join(ctx.attr.interfaces))
 
     ctx.actions.run_shell(
         outputs = [ctx.outputs.out],

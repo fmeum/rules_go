@@ -66,7 +66,7 @@ def emit_archive(go, source = None, _recompile_suffix = ""):
     runfiles = source.runfiles
     data_files = runfiles.files
 
-    # After bazel version 5.0.0, skylark introduced a new API called merge_all().
+    # After bazel version 5.0.0, starlark introduced a new API called merge_all().
     # There is a recommendation in the release notes to use merge_all() if we hit
     # the depth limit because of using merge() in a loop; we saw some repositories
     # hitting this issue after upgrading to 5.0.0. To keep it backward compatible,
