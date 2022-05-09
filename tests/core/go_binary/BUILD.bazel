@@ -176,3 +176,8 @@ go_binary(
     name = "prefix",
     embed = ["//tests/core/go_binary/prefix"],
 )
+
+go_bazel_test(
+    name = "non_executable_test",
+    srcs = ["non_executable_test.go"],
+)

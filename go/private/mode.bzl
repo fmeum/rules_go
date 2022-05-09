@@ -28,6 +28,9 @@ LINKMODE_C_ARCHIVE = "c-archive"
 
 LINKMODES = [LINKMODE_NORMAL, LINKMODE_PLUGIN, LINKMODE_C_SHARED, LINKMODE_C_ARCHIVE, LINKMODE_PIE]
 
+# All link modes that produce executables to be run with bazel run.
+LINKMODES_EXECUTABLE = [LINKMODE_NORMAL, LINKMODE_PIE]
+
 def mode_string(mode):
     result = [mode.goos, mode.goarch]
     if mode.static:

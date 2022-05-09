@@ -372,7 +372,6 @@ _go_binary_kwargs = {
         ),
         "_go_context_data": attr.label(default = "//:go_context_data"),
     },
-    "executable": True,
     "toolchains": ["@io_bazel_rules_go//go:toolchain"],
     "doc": """This builds an executable from a set of source files,
     which must all be in the `main` package. You can run the binary with
@@ -387,8 +386,9 @@ _go_binary_kwargs = {
     """,
 }
 
-go_binary = rule(**_go_binary_kwargs)
-go_transition_binary = go_transition_rule(**_go_binary_kwargs)
+go_binary = rule(executable = True, **_go_binary_kwargs)
+go_transition_binary = go_transition_rule(executable = True, **_go_binary_kwargs)
+go_non_executable_transition_binary = go_transition_rule(executable = False, **_go_binary_kwargs)
 
 def _go_tool_binary_impl(ctx):
     sdk = ctx.attr.sdk[GoSDK]
