@@ -34,6 +34,7 @@ bzl_library(
     visibility = ["//visibility:public"],
     deps = [
         "//extras:embed_data",
+        "//extras:gomock",
         "//go/private:context",
         "//go/private:go_toolchain",
         "//go/private:providers",
