@@ -72,6 +72,11 @@ Slack: `#go on Bazel Slack`_, `#bazel on Go Slack`_
 
 Announcements
 -------------
+2022-06-06
+  Release
+  `v0.33.0 <https://github.com/bazelbuild/rules_go/releases/tag/v0.33.0>`_
+  is now available. This release consists mostly of bug fixes and deprecates
+  the `asm`, `compile`, `cover`, and `pack` actions on `go_context`.
 2022-05-11
   Release
   `v0.32.0 <https://github.com/bazelbuild/rules_go/releases/tag/v0.32.0>`_
@@ -223,10 +228,10 @@ Go toolchain and register it for use.
 
     http_archive(
         name = "io_bazel_rules_go",
-        sha256 = "ab21448cef298740765f33a7f5acee0607203e4ea321219f2a4c85a6e0fb0a27",
+        sha256 = "685052b498b6ddfe562ca7a97736741d87916fe536623afb7da2824c0211c369",
         urls = [
-            "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.32.0/rules_go-v0.32.0.zip",
-            "https://github.com/bazelbuild/rules_go/releases/download/v0.32.0/rules_go-v0.32.0.zip",
+            "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.33.0/rules_go-v0.33.0.zip",
+            "https://github.com/bazelbuild/rules_go/releases/download/v0.33.0/rules_go-v0.33.0.zip",
         ],
     )
 
@@ -234,7 +239,7 @@ Go toolchain and register it for use.
 
     go_rules_dependencies()
 
-    go_register_toolchains(version = "1.18.2")
+    go_register_toolchains(version = "1.18.3")
 
 You can use rules_go at ``master`` by using `git_repository`_ instead of
 `http_archive`_ and pointing to a recent commit.
