@@ -97,6 +97,17 @@ _LINKER_OPTIONS_BLACKLIST = {
     "-Wl,--gc-sections": None,
 }
 
+_UNSUPPORTED_FEATURES = [
+    # These toolchain features require special rule support and will thus break
+    # with CGo.
+    # Taken from https://github.com/bazelbuild/rules_rust/blob/521e649ff44e9711fe3c45b0ec1e792f7e1d361e/rust/private/utils.bzl#L20.
+    "thin_lto",
+    "module_maps",
+    "use_header_modules",
+    "fdo_instrument",
+    "fdo_optimize",
+]
+
 def _match_option(option, pattern):
     if pattern.endswith("="):
         return option.startswith(pattern)
@@ -564,7 +575,7 @@ def _cgo_context_data_impl(ctx):
         ctx = ctx,
         cc_toolchain = cc_toolchain,
         requested_features = ctx.features,
-        unsupported_features = ctx.disabled_features,
+        unsupported_features = ctx.disabled_features + _UNSUPPORTED_FEATURES,
     )
 
     # TODO(jayconrod): keep the environment separate for different actions.
