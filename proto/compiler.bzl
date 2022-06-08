@@ -112,6 +112,7 @@ def go_proto_compile(go, compiler, protos, imports, importpath):
     args.add_all(go_srcs, before_each = "-expected")
     args.add_all(imports, before_each = "-import")
     args.add_all(proto_paths.keys())
+    args.use_param_file("-param=%s")
     go.actions.run(
         inputs = depset(
             direct = [

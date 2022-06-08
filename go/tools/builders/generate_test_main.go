@@ -228,7 +228,7 @@ func main() {
 
 func genTestMain(args []string) error {
 	// Prepare our flags
-	args, err := expandParamsFiles(args)
+	args, _, err := expandParamsFiles(args)
 	if err != nil {
 		return err
 	}
