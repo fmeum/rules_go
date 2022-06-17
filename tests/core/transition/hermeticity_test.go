@@ -277,7 +277,7 @@ type bazelConfigOutput struct {
 	Fragments []struct {
 		Name    string            `json:"name"`
 		Options map[string]string `json:"options"`
-	} `json:"fragments"`
+	} `json:"fragmentOptions"`
 }
 
 type bazelCqueryOutput struct {
