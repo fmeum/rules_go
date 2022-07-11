@@ -28,8 +28,8 @@ load("//go/private/rules:wrappers.bzl", go_binary = "go_binary_macro")
 load("//go/private:providers.bzl", "GoLibrary")
 load("@bazel_skylib//lib:paths.bzl", "paths")
 
-_MOCKGEN_TOOL = "@com_github_golang_mock//mockgen"
-_MOCKGEN_MODEL_LIB = "@com_github_golang_mock//mockgen/model"
+_MOCKGEN_TOOL = Label("//extras/gomock:mockgen")
+_MOCKGEN_MODEL_LIB = Label("//extras/gomock:mockgen_model")
 
 def _gomock_source_impl(ctx):
     go_ctx = go_context(ctx)
@@ -137,7 +137,7 @@ _gomock_source = rule(
         ),
         "mockgen_tool": attr.label(
             doc = "The mockgen tool to run",
-            default = Label(_MOCKGEN_TOOL),
+            default = _MOCKGEN_TOOL,
             allow_single_file = True,
             executable = True,
             cfg = "exec",
@@ -271,7 +271,7 @@ _gomock_prog_gen = rule(
         ),
         "mockgen_tool": attr.label(
             doc = "The mockgen tool to run",
-            default = Label(_MOCKGEN_TOOL),
+            default = _MOCKGEN_TOOL,
             allow_single_file = True,
             executable = True,
             cfg = "exec",
@@ -353,7 +353,7 @@ _gomock_prog_exec = rule(
         ),
         "mockgen_tool": attr.label(
             doc = "The mockgen tool to run",
-            default = Label(_MOCKGEN_TOOL),
+            default = _MOCKGEN_TOOL,
             allow_single_file = True,
             executable = True,
             cfg = "exec",
