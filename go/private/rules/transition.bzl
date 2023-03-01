@@ -32,10 +32,6 @@ load(
     "GoLibrary",
     "GoSource",
 )
-load(
-    "//go/platform:crosstool.bzl",
-    "platform_from_crosstool",
-)
 
 # A list of rules_go settings that are possibly set by go_transition.
 # Keep their package name in sync with the implementation of
@@ -95,8 +91,6 @@ def _go_transition_impl(settings, attr):
 
     goos = getattr(attr, "goos", "auto")
     goarch = getattr(attr, "goarch", "auto")
-    crosstool_top = settings.pop("//command_line_option:crosstool_top")
-    cpu = settings.pop("//command_line_option:cpu")
     _check_ternary("pure", pure)
     if goos != "auto" or goarch != "auto":
         if goos == "auto":
@@ -109,11 +103,6 @@ def _go_transition_impl(settings, attr):
             fail('pure is "off" but cgo is not supported on {} {}'.format(goos, goarch))
         platform = "@io_bazel_rules_go//go/toolchain:{}_{}{}".format(goos, goarch, "_cgo" if cgo else "")
         settings["//command_line_option:platforms"] = platform
-    else:
-        # If not auto, try to detect the platform the inbound crosstool/cpu.
-        platform = platform_from_crosstool(crosstool_top, cpu)
-        if platform:
-            settings["//command_line_option:platforms"] = platform
 
     tags = getattr(attr, "gotags", [])
     if tags:
@@ -171,8 +160,6 @@ request_nogo_transition = transition(
 go_transition = transition(
     implementation = _go_transition_impl,
     inputs = [
-        "//command_line_option:cpu",
-        "//command_line_option:crosstool_top",
         "//command_line_option:platforms",
     ] + TRANSITIONED_GO_SETTING_KEYS,
     outputs = [

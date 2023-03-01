@@ -103,11 +103,6 @@ You may need to use the flags --cpu=x64_windows --compiler=mingw-gcc.`)
 		b.WriteString(sep)
 		sep = "|"
 		b.WriteString(regexp.QuoteMeta(f))
-		// If the flag if -framework, the flag value needs to be in the same
-		// condition.
-		if f == "-framework" {
-			sep = " "
-		}
 	}
 	os.Setenv("CGO_LDFLAGS_ALLOW", b.String())
 	os.Setenv("GODEBUG", "installgoroot=all")
