@@ -26,12 +26,11 @@ use_repo(go_sdk, "go_toolchains")
 
 register_toolchains("@go_toolchains//:all")
 
-bazel_dep(name = "gazelle", version = "0.27.0")
+bazel_dep(name = "gazelle", version = "0.30.0")
 
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//:go.mod")
 go_deps.module(
-    build_file_proto_mode = "disable",
     path = "github.com/gogo/protobuf",
     sum = "h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=",
     version = "v1.3.2",
