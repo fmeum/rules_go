@@ -15,6 +15,7 @@ use_repo(
     non_module_dependencies,
     "go_googleapis",
     "io_bazel_rules_nogo",
+    "org_golang_x_sys",
 )
 
 go_sdk = use_extension("//go:extensions.bzl", "go_sdk")
