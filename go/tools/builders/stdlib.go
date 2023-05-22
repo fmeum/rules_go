@@ -91,6 +91,7 @@ You may need to use the flags --cpu=x64_windows --compiler=mingw-gcc.`)
 	os.Setenv("PATH", strings.Join(absPaths, string(os.PathListSeparator)))
 
 	sandboxPath := abs(".")
+	os.Setenv("BAZEL_SANDBOX_PATH", sandboxPath)
 
 	// Strip path prefix from source files in debug information.
 	os.Setenv("CGO_CFLAGS", os.Getenv("CGO_CFLAGS")+" "+strings.Join(defaultCFlags(output), " "))

@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"syscall"
 )
 
@@ -32,6 +33,14 @@ func filterBuildID(args []string) error {
 			continue
 		}
 		newArgs = append(newArgs, arg)
+	}
+	if strings.HasSuffix(newArgs[0], "/cgo") {
+		// There doesn't seem to be another way to ensure cgo is called with -trimpath here:
+		// https://github.com/golang/go/blob/8c445b7c9fe6738cbef2040a1011bd11489b0806/src/cmd/go/internal/work/exec.go#L3288
+		newArgs = append([]string{
+			newArgs[0],
+			"-trimpath", os.Getenv("BAZEL_SANDBOX_PATH"),
+		}, newArgs[1:]...)
 	}
 	if runtime.GOOS == "windows" {
 		cmd := exec.Command(newArgs[0], newArgs[1:]...)

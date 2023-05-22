@@ -9,7 +9,7 @@ import (
 
 // A distinctive substring contained in every absolute path pointing into the
 // Bazel cache.
-const execPathIndicator = "/execroot/io_bazel_rules_go"
+const execPathIndicator = "/execroot/"
 
 func verifyNoCachePaths(t *testing.T, shortPath string) {
 	binPath, err := bazel.Runfile(shortPath)

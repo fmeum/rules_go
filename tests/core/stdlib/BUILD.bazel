@@ -8,4 +8,11 @@ go_test(
     deps = ["//go/runfiles"],
 )
 
+go_test(
+    name = "hermeticity_test",
+    srcs = ["hermeticity_test.go"],
+    data = [":stdlib_files"],
+    deps = ["//go/runfiles"],
+)
+
 stdlib_files(name = "stdlib_files")
