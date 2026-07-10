@@ -478,6 +478,8 @@ def _go_binary_kwargs(go_cc_aspects = []):
                 doc = """Provides a pprof file to be used for profile guided optimization when compiling go targets.
                 A pprof file can also be provided via `--@io_bazel_rules_go//go/config:pgoprofile=<label of a pprof file>`.
                 Profile guided optimization is only supported on go 1.20+.
+                With go 1.23+, the profile is preprocessed with `go tool preprofile` once per build
+                configuration instead of being parsed by every compile action.
                 See https://go.dev/doc/pgo for more information.
                 """,
                 default = "//go/config:empty",
