@@ -1006,9 +1006,42 @@ def cgo_context_data_impl(ctx):
         ),
     )
 
+def _preprocess_pgoprofile(ctx, sdk, pgoprofile):
+    """Preprocesses a pprof profile for use by the compiler.
+
+    Parsing a pprof profile is relatively slow, so instead of passing the raw
+    profile to every GoCompilePkg and GoStdlib action, run `go tool preprofile`
+    on it once per build configuration and feed the resulting intermediate
+    representation to the compiler, which accepts both formats and detects
+    them automatically.
+    """
+    preprofile_tool = None
+    for tool in sdk.tools.to_list():
+        if tool.basename == "preprofile" or tool.basename == "preprofile.exe":
+            preprofile_tool = tool
+            break
+    if not preprofile_tool:
+        # SDKs before Go 1.23 don't ship cmd/preprofile and their compilers
+        # only understand the raw pprof format, so pass the profile through
+        # unmodified.
+        return pgoprofile
+    out = ctx.actions.declare_file(ctx.label.name + ".preprofile")
+    args = ctx.actions.args()
+    args.add("-i", pgoprofile)
+    args.add("-o", out)
+    ctx.actions.run(
+        inputs = [pgoprofile],
+        outputs = [out],
+        executable = preprofile_tool,
+        arguments = [args],
+        mnemonic = "GoPreprofile",
+        progress_message = "Preprocessing PGO profile " + pgoprofile.short_path,
+    )
+    return out
+
 def _go_config_impl(ctx):
     pgo_profiles = ctx.attr.pgoprofile.files.to_list()
-    if len(pgo_profiles) > 2:
+    if len(pgo_profiles) > 1:
         fail("providing more than one pprof file to pgoprofile is not supported")
     if len(pgo_profiles) == 1:
         pgoprofile = pgo_profiles[0]
@@ -1028,6 +1061,9 @@ def _go_config_impl(ctx):
         tags.append("msan")
 
     toolchain = ctx.toolchains[GO_TOOLCHAIN]
+
+    if pgoprofile:
+        pgoprofile = _preprocess_pgoprofile(ctx, toolchain.sdk, pgoprofile)
 
     linkmode = ctx.attr.linkmode[BuildSettingInfo].value
     if linkmode == "auto":

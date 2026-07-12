@@ -57,9 +57,9 @@ func main() {
 	})
 }
 
-func TestGoBinaryOutputWithPgoProfileDiffersFromGoBinaryWithoutPgoProfile(t *testing.T) {
-	// Write the pgo.pprof file.
-	// This must be done as txtar changes the content of the pprof file and it could not be parsed.
+// writePgoProfile writes the pgo.pprof file into the test workspace.
+// This must be done as txtar changes the content of the pprof file and it could not be parsed.
+func writePgoProfile(t *testing.T) {
 	pwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -67,6 +67,10 @@ func TestGoBinaryOutputWithPgoProfileDiffersFromGoBinaryWithoutPgoProfile(t *tes
 	if err := os.WriteFile(path.Join(pwd, "src", "pgo.pprof"), pgoProfile, 0644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestGoBinaryOutputWithPgoProfileDiffersFromGoBinaryWithoutPgoProfile(t *testing.T) {
+	writePgoProfile(t)
 
 	// Ensure both targets can be built
 	if err := bazel_testing.RunBazel("build", "//src:all"); err != nil {
@@ -74,9 +78,8 @@ func TestGoBinaryOutputWithPgoProfileDiffersFromGoBinaryWithoutPgoProfile(t *tes
 	}
 
 	// Get the paths to the two binaries.
-	var out []byte
-	var stderr []byte
-	if out, stderr, err = bazel_testing.BazelOutputWithInput(nil, "cquery", "--output=files", "//src:all"); err != nil {
+	out, stderr, err := bazel_testing.BazelOutputWithInput(nil, "cquery", "--output=files", "//src:all")
+	if err != nil {
 		t.Fatal(err)
 	}
 	files := strings.Split(strings.TrimSpace(string(out)), "\n")
@@ -96,5 +99,41 @@ func TestGoBinaryOutputWithPgoProfileDiffersFromGoBinaryWithoutPgoProfile(t *tes
 
 	if reflect.DeepEqual(firstBinary, secondBinary) {
 		t.Fatal("the two binaries are equal when they should be different")
+	}
+}
+
+func TestPgoProfileIsPreprocessedOncePerConfiguration(t *testing.T) {
+	// This test assumes an SDK of at least Go 1.23, the first version to
+	// ship the preprofile tool.
+	writePgoProfile(t)
+
+	// Both the compile and the stdlib actions must consume the profile
+	// preprocessed by `go tool preprofile` instead of parsing the raw pprof
+	// file themselves.
+	for _, mnemonic := range []string{"GoCompilePkg", "GoStdlib"} {
+		query := `mnemonic("` + mnemonic + `", deps(//src:pgo_with_profile))`
+		out, stderr, err := bazel_testing.BazelOutputWithInput(nil, "aquery", "--include_artifacts=false", query)
+		if err != nil {
+			t.Fatalf("bazel aquery '%s': %v\n%s", query, err, string(stderr))
+		}
+		if !strings.Contains(string(out), ".preprofile") {
+			t.Errorf("expected %s actions to consume a preprocessed profile; aquery output:\n%s", mnemonic, string(out))
+		}
+		if strings.Contains(string(out), "pgo.pprof") {
+			t.Errorf("expected %s actions not to consume the raw pprof file; aquery output:\n%s", mnemonic, string(out))
+		}
+	}
+
+	// The raw profile is only parsed by GoPreprofile actions, of which there
+	// is at most one per configuration (one for the target configuration and
+	// possibly one for the stdlib configuration if it differs).
+	query := `mnemonic("GoPreprofile", deps(//src:pgo_with_profile))`
+	out, stderr, err := bazel_testing.BazelOutputWithInput(nil, "aquery", "--include_artifacts=false", query)
+	if err != nil {
+		t.Fatalf("bazel aquery '%s': %v\n%s", query, err, string(stderr))
+	}
+	preprofileActions := strings.Count(string(out), "Mnemonic: GoPreprofile")
+	if preprofileActions < 1 || preprofileActions > 2 {
+		t.Errorf("expected one or two GoPreprofile actions, got %d; aquery output:\n%s", preprofileActions, string(out))
 	}
 }
