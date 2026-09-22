@@ -470,7 +470,13 @@ added to pass information to the ``compile`` function. This interface is
 | :param:`compile`            | :type:`Function`                                |
 +-----------------------------+-------------------------------------------------+
 | A function which declares output files and actions when called. See           |
-| `compiler.bzl`_ for details.                                                  |
+| `compiler.bzl`_ for details. The actions must run in the exec group named     |
+| by ``GO_PROTO_GEN_EXEC_GROUP`` in `compiler.bzl`_. ``go_proto_library``       |
+| depends on its compilers a second time, configured for the execution          |
+| platform of that exec group, and passes that configured provider to           |
+| ``compile``. Tools referenced by it (such as the ``plugin`` of a              |
+| ``go_proto_compiler``) must therefore be ordinary dependencies rather than    |
+| ``cfg = "exec"`` dependencies of the compiler rule.                           |
 +-----------------------------+-------------------------------------------------+
 | :param:`valid_archive`      | :type:`bool`                                    |
 +-----------------------------+-------------------------------------------------+

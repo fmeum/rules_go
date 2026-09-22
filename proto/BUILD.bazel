@@ -179,6 +179,7 @@ bzl_library(
         "//go:def",
         "//go/private:providers",
         "//proto:compiler",
+        "//proto/private:library",
     ],  # keep
 )
 

@@ -1,8 +1,23 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load(":toolchain.bzl", "legacy_proto_toolchain")
 
 legacy_proto_toolchain(
     name = "legacy_proto_toolchain",
     visibility = ["//visibility:public"],
+)
+
+bzl_library(
+    name = "library",
+    srcs = ["library.bzl"],
+    visibility = ["//visibility:public"],
+    # Don't list dependency on @rules_proto//proto:defs
+    deps = [
+        "//go:def",
+        "//go/private:providers",
+        "//go/private/rules:transition",
+        "//proto:compiler",
+        "@bazel_skylib//lib:types",
+    ],  # keep
 )
 
 filegroup(

@@ -48,15 +48,6 @@ _PROTO_TOOLCHAIN_TYPE = "@rules_proto//proto:toolchain_type"
 def _incompatible_toolchains_enabled():
     return getattr(proto_common, "INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION", False)
 
-def _find_toolchain(ctx, legacy_attr, toolchain_type):
-    if _incompatible_toolchains_enabled():
-        toolchain = ctx.toolchains[toolchain_type]
-        if not toolchain:
-            fail("No toolchains registered for '%s'." % toolchain_type)
-        return toolchain.proto
-    else:
-        return getattr(ctx.attr, legacy_attr)[ProtoLangToolchainInfo]
-
 def _use_toolchain(toolchain_type):
     if _incompatible_toolchains_enabled():
         return [config_common.toolchain_type(toolchain_type, mandatory = False)]
@@ -69,19 +60,80 @@ def _if_legacy_toolchain(legacy_attr_dict):
     else:
         return legacy_attr_dict
 
+# The exec group in which go_proto_library runs its GoProtocGen actions.
+#
+# Every tool these actions execute has to be built for the execution platform
+# resolved for this exec group, otherwise the action may e.g. attempt to run a
+# host binary on a remote worker ("Exec format error"). This is guaranteed by
+# construction rather than by matching independent toolchain resolutions:
+#
+# * protoc comes from the proto toolchain resolved for this exec group (with
+#   --incompatible_enable_proto_toolchain_resolution) or from an attribute with
+#   cfg = config.exec(GO_PROTO_GEN_EXEC_GROUP) (without it). Toolchains
+#   resolved for an exec group build their tools for its execution platform.
+# * go-protoc and the plugin are ordinary (untransitioned) dependencies of
+#   go_proto_compiler. go_proto_library depends on its compilers with
+#   cfg = config.exec(GO_PROTO_GEN_EXEC_GROUP) to obtain these tools, so they
+#   are built for exactly the platform the action runs on.
+#
+# The exec group intentionally does not require the Go toolchain: the Go tools
+# are cross-compiled for its execution platform by their own toolchain
+# resolution and do not need a Go SDK at runtime. Requiring it would restrict
+# the action to platforms with a registered Go SDK for no benefit.
+GO_PROTO_GEN_EXEC_GROUP = "internal_use_only_go_proto_gen"
+
+def go_proto_gen_exec_groups():
+    """Returns the exec_groups a rule needs to call go_proto_compile."""
+    return {
+        GO_PROTO_GEN_EXEC_GROUP: exec_group(
+            toolchains = _use_toolchain(_PROTO_TOOLCHAIN_TYPE),
+        ),
+    }
+
+def go_proto_gen_attrs():
+    """Returns the attributes a rule needs to call find_proto_toolchain."""
+    return _if_legacy_toolchain({
+        "_legacy_proto_toolchain": attr.label(
+            # Setting cfg = config.exec(...) here as the legacy_proto_toolchain
+            # target already needs to apply the non_go_tool_transition.
+            # Flipping the two would be more idiomatic, but
+            # proto_toolchains.find_toolchain doesn't support split transitions.
+            cfg = config.exec(GO_PROTO_GEN_EXEC_GROUP),
+            default = "//proto/private:legacy_proto_toolchain",
+        ),
+    })
+
+def find_proto_toolchain(ctx):
+    """Returns the ProtoLangToolchainInfo providing protoc for GoProtocGen actions.
+
+    The rule must declare go_proto_gen_exec_groups() and go_proto_gen_attrs().
+    """
+    if _incompatible_toolchains_enabled():
+        toolchain = ctx.exec_groups[GO_PROTO_GEN_EXEC_GROUP].toolchains[_PROTO_TOOLCHAIN_TYPE]
+        if not toolchain:
+            fail("No toolchains registered for '%s'." % _PROTO_TOOLCHAIN_TYPE)
+        return toolchain.proto
+    else:
+        return ctx.attr._legacy_proto_toolchain[ProtoLangToolchainInfo]
+
 GoProtoCompiler = provider(
     doc = "Information and dependencies needed to generate Go code from protos",
     fields = {
         "compile": """A function with the signature:
 
-    def compile(go, compiler, protos, imports, importpath)
+    def compile(go, compiler, protos, imports, importpath, proto_toolchain)
 
 where go is the go_context object, compiler is this GoProtoCompiler, protos
 is a list of ProtoInfo providers for protos to compile, imports is a depset
-of strings mapping proto import paths to Go import paths, and importpath is
-the import path of the Go library being generated.
+of strings mapping proto import paths to Go import paths, importpath is
+the import path of the Go library being generated and proto_toolchain is the
+ProtoLangToolchainInfo providing protoc for the GO_PROTO_GEN_EXEC_GROUP exec
+group.
 
 The function should declare output .go files and actions to generate them.
+Actions must run in the GO_PROTO_GEN_EXEC_GROUP exec group; the compiler
+passed to this function has been configured for that exec group's execution
+platform, so its tools can be executed by such actions.
 It should return a list of .go Files to be compiled by the Go compiler.
 """,
         "deps": """List of targets providing GoInfo and GoArchive.
@@ -98,15 +150,18 @@ to structs produced by other compilers will set this to False.""",
     },
 )
 
-def go_proto_compile(go, compiler, protos, imports, importpath):
+def go_proto_compile(go, compiler, protos, imports, importpath, proto_toolchain):
     """Invokes protoc to generate Go sources for a given set of protos
 
     Args:
         go: the go object, returned by go_context.
-        compiler: a GoProtoCompiler provider.
+        compiler: a GoProtoCompiler provider, configured for the execution
+            platform of the GO_PROTO_GEN_EXEC_GROUP exec group.
         protos: list of ProtoInfo providers for protos to compile.
         imports: depset of strings mapping proto import paths to Go import paths.
         importpath: the import path of the Go library being generated.
+        proto_toolchain: the ProtoLangToolchainInfo returned by
+            find_proto_toolchain, providing protoc for the same exec group.
 
     Returns:
         A list of .go Files generated by the compiler.
@@ -146,7 +201,7 @@ def go_proto_compile(go, compiler, protos, imports, importpath):
     transitive_descriptor_sets = depset(direct = [], transitive = desc_sets)
 
     args = go.actions.args()
-    args.add("-protoc", compiler.internal.protoc.executable)
+    args.add("-protoc", proto_toolchain.proto_compiler.executable)
     args.add("-importpath", importpath)
     args.add("-out_path", outpath)
     args.add("-plugin", compiler.internal.plugin.executable)
@@ -173,8 +228,8 @@ def go_proto_compile(go, compiler, protos, imports, importpath):
         progress_message = "Generating into %s" % go_srcs[0].dirname,
         mnemonic = "GoProtocGen",
         executable = compiler.internal.go_protoc,
-        exec_group = "internal_use_only_go_proto_gen",
-        tools = [compiler.internal.protoc, compiler.internal.plugin],
+        exec_group = GO_PROTO_GEN_EXEC_GROUP,
+        tools = [proto_toolchain.proto_compiler, compiler.internal.plugin],
         arguments = [args],
         env = go.env,
         # We may need the shell environment (potentially augmented with --action_env)
@@ -217,11 +272,6 @@ def _go_proto_compiler_impl(ctx):
         maybe_needs_cc_toolchain = False,
     )
     go_info = new_go_info(go, ctx.attr)
-    proto_toolchain = _find_toolchain(
-        ctx,
-        legacy_attr = "_legacy_proto_toolchain",
-        toolchain_type = _PROTO_TOOLCHAIN_TYPE,
-    )
     return [
         GoProtoCompiler(
             deps = ctx.attr.deps,
@@ -232,7 +282,6 @@ def _go_proto_compiler_impl(ctx):
                 options = ctx.attr.options,
                 suffix = ctx.attr.suffix,
                 suffixes = ctx.attr.suffixes,
-                protoc = proto_toolchain.proto_compiler,
                 go_protoc = ctx.executable._go_protoc,
                 plugin = ctx.attr.plugin[DefaultInfo].files_to_run,
                 import_path_option = ctx.attr.import_path_option,
@@ -254,30 +303,26 @@ _go_proto_compiler = go_rule(
             doc = "indicates whether this proto compiler always generate files, regardless of whether the proto files have relevant definitions (e.g., services for grpc_gateway).",
         ),
         "import_path_option": attr.bool(default = False),
+        # The tools are deliberately not built with cfg = "exec": that would
+        # resolve an execution platform for this target, which is unrelated to
+        # the one go_proto_library's GoProtocGen actions run on. Instead,
+        # go_proto_library depends on this target with
+        # cfg = config.exec(GO_PROTO_GEN_EXEC_GROUP), so that the tools are
+        # configured for the execution platform of the actions that run them.
         "plugin": attr.label(
             executable = True,
-            cfg = "exec",
+            cfg = "target",
             mandatory = True,
         ),
         "_go_protoc": attr.label(
             executable = True,
-            cfg = "exec",
+            cfg = "target",
             default = "//go/tools/builders:go-protoc",
         ),
         "_go_context_data": attr.label(
             default = "//:go_context_data",
         ),
-    } | _if_legacy_toolchain({
-        "_legacy_proto_toolchain": attr.label(
-            # Setting cfg = "exec" here as the legacy_proto_toolchain target
-            # already needs to apply the non_go_tool_transition. Flipping the
-            # two would be more idiomatic, but proto_toolchains.find_toolchain
-            # doesn't support split transitions.
-            cfg = "exec",
-            default = "//proto/private:legacy_proto_toolchain",
-        ),
-    }),
-    toolchains = _use_toolchain(_PROTO_TOOLCHAIN_TYPE),
+    },
 )
 
 def go_proto_compiler(name, **kwargs):

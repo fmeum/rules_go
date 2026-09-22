@@ -150,7 +150,7 @@ bzl_library(
     srcs = ["transition.bzl"],
     visibility = [
         "//go:__subpackages__",
-        "//proto:__pkg__",
+        "//proto:__subpackages__",
     ],
     deps = [
         "//go/private:mode",
