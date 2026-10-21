@@ -179,8 +179,12 @@ go_transition = transition(
     ] + TRANSITIONED_GO_SETTING_KEYS + _SETTING_KEY_TO_ORIGINAL_SETTING_KEY.values(),
 )
 
-_common_reset_transition_dict = dict({
-    "//go/private:request_nogo": False,
+# Every Go setting at its default value. The tool transitions below start from
+# this so that their configurations differ from the default one in as few
+# settings as possible, as each difference forks the configuration of
+# everything that is resolved in it, e.g. the C++ toolchain.
+_reset_transition_dict = dict({
+    "//go/private:bootstrap_nogo": False,
     "//go/config:static": False,
     "//go/config:msan": False,
     "//go/config:race": False,
@@ -191,10 +195,6 @@ _common_reset_transition_dict = dict({
     "//go/config:pgoprofile": Label("//go/config:empty"),
 }, **{setting: "" for setting in _SETTING_KEY_TO_ORIGINAL_SETTING_KEY.values()})
 
-_reset_transition_dict = dict(_common_reset_transition_dict, **{
-    "//go/private:bootstrap_nogo": True,
-})
-
 _reset_transition_keys = sorted(_reset_transition_dict.keys())
 
 _stdlib_keep_keys = sorted([
@@ -204,6 +204,15 @@ _stdlib_keep_keys = sorted([
     "//go/config:linkmode",
     "//go/config:tags",
     "//go/config:pgoprofile",
+] + [
+    # go_transition records the previous value of each setting it changes.
+    # Keeping those records puts the stdlib in the same configuration as the
+    # packages it is built for. The exception is `tags`, which is filtered
+    # below: keeping its record would build a second, identical stdlib for
+    # binaries that set `gotags`.
+    _SETTING_KEY_TO_ORIGINAL_SETTING_KEY[key]
+    for key in TRANSITIONED_GO_SETTING_KEYS
+    if key != "//go/config:tags"
 ])
 
 def _go_tool_transition_impl(settings, _attr):
@@ -224,6 +233,10 @@ def _go_tool_transition_impl(settings, _attr):
     new_settings = dict(settings, **_reset_transition_dict)
     for key in TOOL_INHERITED_SETTING_KEYS:
         new_settings[key] = _setting_before_go_transition(settings, key)
+
+    # Keeps nogo from running on nogo's own dependencies, which would be a
+    # dependency cycle.
+    new_settings["//go/private:bootstrap_nogo"] = True
     return new_settings
 
 go_tool_transition = transition(
@@ -246,13 +259,7 @@ def _non_go_tool_transition_impl(settings, _attr):
     Examples: This transition is applied to attributes referencing proto_library
     targets or protoc directly.
     """
-    settings = dict(settings, **_reset_transition_dict)
-
-    # Non-Go tools don't run nogo, so use the default values rather than the
-    # tool values to share the configuration of plain exec tools.
-    settings["//go/private:bootstrap_nogo"] = False
-    settings["//go/private:request_nogo"] = True
-    return settings
+    return dict(settings, **_reset_transition_dict)
 
 non_go_tool_transition = transition(
     implementation = _non_go_tool_transition_impl,
@@ -273,12 +280,6 @@ def _go_stdlib_transition_impl(settings, _attr):
         if label not in _stdlib_keep_keys:
             settings[label] = value
     settings["//go/config:tags"] = [t for t in settings["//go/config:tags"] if t in _TAG_AFFECTS_STDLIB]
-
-    # The standard library doesn't run nogo, so use the default values rather
-    # than the tool values to share the configuration of both regular targets
-    # and plain exec tools.
-    settings["//go/private:bootstrap_nogo"] = False
-    settings["//go/private:request_nogo"] = True
     settings["//command_line_option:collect_code_coverage"] = False
     return settings
 
