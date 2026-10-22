@@ -20,7 +20,7 @@ import (
 )
 
 func TestMatchImportPaths(t *testing.T) {
-	pr := NewPackageRegistry(bazelVersion{},
+	pr := NewPackageRegistry(
 		&FlatPackage{ID: "//lib:go_default_library", Name: "lib", PkgPath: "example.com/lib"},
 		&FlatPackage{ID: "//lib/sub:go_default_library", Name: "sub", PkgPath: "example.com/lib/sub"},
 		&FlatPackage{ID: "//other:go_default_library", Name: "other", PkgPath: "example.com/other"},

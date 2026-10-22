@@ -46,8 +46,7 @@ func runFromPkgJSON(listPath string, request *packages.DriverRequest, queries []
 		}
 		return p
 	}
-	// bazelVersion is unused for ID lookup on this path (GetResponseFromIDs).
-	driver, err := NewJSONPackagesDriver(jsonFiles, resolve, bazelVersion{}, request.Overlay)
+	driver, err := NewJSONPackagesDriver(jsonFiles, resolve, request.Overlay)
 	if err != nil {
 		return err
 	}

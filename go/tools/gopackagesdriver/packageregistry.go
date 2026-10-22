@@ -25,14 +25,12 @@ import (
 type PackageRegistry struct {
 	packagesByID map[string]*packages.Package
 	stdlib       map[string]*packages.Package
-	bazelVersion bazelVersion
 }
 
-func NewPackageRegistry(bazelVersion bazelVersion, pkgs ...*FlatPackage) *PackageRegistry {
+func NewPackageRegistry(pkgs ...*FlatPackage) *PackageRegistry {
 	pr := &PackageRegistry{
 		packagesByID: map[string]*packages.Package{},
 		stdlib:       map[string]*packages.Package{},
-		bazelVersion: bazelVersion,
 	}
 	pr.Add(pkgs...)
 	return pr
@@ -174,8 +172,8 @@ func (pr *PackageRegistry) Match(labels []string) ([]string, []*packages.Package
 	return pr.match(labels, true)
 }
 
-// MatchCanonicalIDs is like Match but does not rewrite labels for Bazel 6+
-// canonical form. Use it when IDs already come from .pkg.json.
+// MatchCanonicalIDs is like Match but does not prefix @ onto IDs.
+// Use it when IDs already come from .pkg.json.
 func (pr *PackageRegistry) MatchCanonicalIDs(ids []string) ([]string, []*packages.Package) {
 	return pr.match(ids, false)
 }
@@ -185,9 +183,7 @@ func (pr *PackageRegistry) match(labels []string, canonicalize bool) ([]string, 
 
 	for _, label := range labels {
 		// When packagesdriver is ran from rules go, rulesGoRepositoryName will just be @
-		if canonicalize && pr.bazelVersion.isAtLeast(bazelVersion{6, 0, 0}) &&
-			!strings.HasPrefix(label, "@") {
-			// Canonical labels is only since Bazel 6.0.0
+		if canonicalize && !strings.HasPrefix(label, "@") {
 			label = fmt.Sprintf("@%s", label)
 		}
 
