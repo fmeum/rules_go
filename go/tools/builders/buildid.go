@@ -21,6 +21,7 @@ import (
 	"debug/macho"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -69,24 +70,43 @@ func hasContentBuildID(goos string) bool {
 // reproducible. Binaries without the placeholder, e.g. built with -buildid in
 // gc_linkopts, are left untouched.
 func setContentBuildID(path string) error {
-	data, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
-	sum := sha256.Sum256(data)
-	if bytes.HasPrefix(data, []byte(elf.ELFMAG)) {
-		return setELFBuildID(path, data, sum)
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err
 	}
-	return setMachOBuildID(path, data, sum)
+	var sum [sha256.Size]byte
+	h.Sum(sum[:0])
+
+	var magic [len(elf.ELFMAG)]byte
+	if _, err := f.ReadAt(magic[:], 0); err != nil {
+		return err
+	}
+	if string(magic[:]) == elf.ELFMAG {
+		return setELFBuildID(path, f, sum)
+	}
+	return setMachOBuildID(path, f, sum)
 }
 
-func setELFBuildID(path string, data []byte, sum [sha256.Size]byte) error {
-	f, err := elf.NewFile(bytes.NewReader(data))
+func setELFBuildID(path string, r io.ReaderAt, sum [sha256.Size]byte) error {
+	f, err := elf.NewFile(r)
 	if err != nil {
 		return err
 	}
 	goStart, goEnd, ok := noteDesc(f, elfGoBuildIDSection)
-	if !ok || string(data[goStart:goEnd]) != buildIDPlaceholder {
+	if !ok || goEnd-goStart != int64(len(buildIDPlaceholder)) {
+		return nil
+	}
+	goID := make([]byte, len(buildIDPlaceholder))
+	if _, err := r.ReadAt(goID, goStart); err != nil {
+		return err
+	}
+	if string(goID) != buildIDPlaceholder {
 		return nil
 	}
 
@@ -102,21 +122,32 @@ func setELFBuildID(path string, data []byte, sum [sha256.Size]byte) error {
 
 // setMachOBuildID re-signs the binary after patching it, because the code
 // signature covers both the Go build ID and LC_UUID.
-func setMachOBuildID(path string, data []byte, sum [sha256.Size]byte) error {
-	f, err := macho.NewFile(bytes.NewReader(data))
+func setMachOBuildID(path string, r io.ReaderAt, sum [sha256.Size]byte) error {
+	f, err := macho.NewFile(r)
 	if err != nil {
 		return err
 	}
 	if f.Magic != macho.Magic64 {
 		return fmt.Errorf("not 64-bit Mach-O file: %s", path)
 	}
-	// The Go linker stores the Go build ID in the text segment on Mach-O.
-	i := bytes.Index(data, []byte(goBuildPrefix+buildIDPlaceholder+goBuildEnd))
+	// The Go linker stores the Go build ID at the start of the __text section.
+	// Like cmd/internal/buildid, only search the first 32 KiB of it:
+	// https://cs.opensource.google/go/go/+/refs/tags/go1.26.7:src/cmd/internal/buildid/note.go;l=176-213
+	text := f.Section("__text")
+	if text == nil {
+		return fmt.Errorf("no __text section: %s", path)
+	}
+	head := make([]byte, 32<<10)
+	n, err := text.ReadAt(head, 0)
+	if err != nil && err != io.EOF {
+		return err
+	}
+	i := bytes.Index(head[:n], []byte(goBuildPrefix+buildIDPlaceholder+goBuildEnd))
 	if i < 0 {
 		return nil
 	}
 
-	patches := map[int64][]byte{int64(i + len(goBuildPrefix)): []byte(goBuildID(sum))}
+	patches := map[int64][]byte{int64(text.Offset) + int64(i+len(goBuildPrefix)): []byte(goBuildID(sum))}
 	if off, ok := machoUUIDOffset(f); ok {
 		uuid := make([]byte, 16)
 		copy(uuid, sum[:])
