@@ -336,22 +336,49 @@ need to configure them:
   invocations
 - `GOPACKAGESDRIVER_PKG_JSON_LIST`: path to a file listing `.pkg.json` files
   produced by `go_pkg_info_aspect`, one per line. When set, the driver answers
-  from those files and never invokes `bazel`, so `go/packages`-based tools can
-  run inside a Bazel action. Placeholder paths resolve against the working
-  directory (the execution root inside an action). Only import-path queries
-  (optionally ending in `/...`) are supported. Files are filtered for the
-  `GOOS`, `GOARCH` and `GOTAGS` of the driver's environment, so set them in the
-  action when targeting another platform.
+  from those files and never invokes `bazel`. Rules don't need to set this
+  themselves, see [Running go/packages tools in actions](#running-gopackages-tools-in-actions).
 
-  The list must contain the transitive `GoPkgInfo.pkg_json_files` and the
-  `GoPkgInfo.stdlib_json_file`. Declare these JSON files, the list itself,
-  `GoPkgInfo.compiled_go_files`, `GoPkgInfo.export_files`, and
-  `GoPkgInfo.stdlib_cache_dir` (when present) as action inputs. Also declare
-  the matching Go SDK's sources (for example, `@go_sdk//:srcs`, using your
-  SDK repository's name). The aspect's source output does not include SDK
-  sources; without them, loading standard-library types with the default
-  `export_stdlib = False`, or requesting dependency syntax, can fail inside
-  a sandbox even though it works from an unsandboxed execution root.
+## Running go/packages tools in actions
+Tools built on `golang.org/x/tools/go/packages`, such as code generators or
+linters, can run inside an action of the same build. Apply
+`go_pkg_info_aspect` to the Go targets the tool should load and pass the
+`driver_inputs` and `driver_env` of their `GoPkgInfo` to the action:
+
+```starlark
+load("@io_bazel_rules_go//go:def.bzl", "GoArchive")
+load("@io_bazel_rules_go//go/tools/gopackagesdriver:aspect.bzl", "GoPkgInfo", "go_pkg_info_aspect")
+
+def _my_rule_impl(ctx):
+    pkg_info = ctx.attr.dep[GoPkgInfo]
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.run(
+        executable = ctx.executable._tool,
+        arguments = [ctx.attr.dep[GoArchive].data.importpath, out.path],
+        inputs = pkg_info.driver_inputs,
+        env = pkg_info.driver_env,
+        outputs = [out],
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+my_rule = rule(
+    implementation = _my_rule_impl,
+    attrs = {
+        "dep": attr.label(providers = [GoArchive], aspects = [go_pkg_info_aspect]),
+        "_tool": attr.label(default = "//my/tool", executable = True, cfg = "exec"),
+    },
+)
+```
+
+`driver_env` points `GOPACKAGESDRIVER` at the driver and sets `GOOS`, `GOARCH`,
+`GOTAGS` and `CGO_ENABLED` to the target's configuration. `driver_inputs`
+contains the driver and everything it needs to describe the target, its
+transitive dependencies and the standard library, including the Go SDK sources
+needed to type-check the standard library from source. The tool must run with
+the execution root as its working directory and can only query packages by
+import path (optionally ending in `/...`). See
+[tests/core/go_pkg_info_aspect](../tests/core/go_pkg_info_aspect) for a
+complete example.
 
 ## Debugging
 It is possible to debug driver issues by calling it directly and looking at the errors

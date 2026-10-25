@@ -11,6 +11,7 @@ Contents
 * `Misc configuration transition tests <transition/README.rst>`_
 * `Basic go_library functionality <go_library/README.rst>`_
 * `output_groups functionality <output_groups/README.rst>`_
+* `go_pkg_info_aspect <go_pkg_info_aspect/README.rst>`_
 * `Basic -buildmode=plugin functionality <go_plugin/README.rst>`_
 * `go_bazel_test macro functionality <go_bazel_test/README.rst>`_
 * `Core Go rules tests <nogo/README.rst>`_

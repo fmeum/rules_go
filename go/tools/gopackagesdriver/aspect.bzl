@@ -24,7 +24,15 @@ load(
     is_file_external_lib = "is_file_external",
 )
 
-GoPkgInfo = provider()
+GoPkgInfo = provider(
+    doc = """Information needed to load a Go target with gopackagesdriver.
+
+    driver_inputs and driver_env let a rule run a go/packages-based tool in an
+    action of the same build: pass them as the action's inputs and env and
+    query the target by its import path. They are empty for targets that don't
+    provide GoArchive.
+    """,
+)
 
 DEPS_ATTRS = [
     "deps",
@@ -59,10 +67,20 @@ def make_pkg_json(ctx, name, pkg_info):
     ctx.actions.write(pkg_json_file, content = json.encode(pkg_info))
     return pkg_json_file
 
+def _write_pkg_json_list(ctx, pkg_json_files, stdlib_json_file):
+    pkg_json_list = ctx.actions.declare_file(ctx.label.name + ".pkg_json_list")
+    args = ctx.actions.args()
+    args.set_param_file_format("multiline")
+    args.add_all(pkg_json_files)
+    args.add(stdlib_json_file)
+    ctx.actions.write(pkg_json_list, args)
+    return pkg_json_list
+
 def _go_pkg_info_aspect_impl(target, ctx):
     # Fetch the stdlib JSON file from the inner most target
     stdlib_json_file = None
     stdlib_cache_dir = None
+    stdlib_srcs = None
 
     transitive_json_files = []
     transitive_export_files = []
@@ -86,6 +104,7 @@ def _go_pkg_info_aspect_impl(target, ctx):
                 if not stdlib_json_file:
                     stdlib_json_file = pkg_info.stdlib_json_file
                     stdlib_cache_dir = pkg_info.stdlib_cache_dir
+                    stdlib_srcs = pkg_info.stdlib_srcs
 
     pkg_json_files = []
     compiled_go_files = []
@@ -113,24 +132,61 @@ def _go_pkg_info_aspect_impl(target, ctx):
     # If there was no stdlib json in any dependencies, fetch it from the
     # current go_ node.
     if not stdlib_json_file:
-        stdlib_json_file = ctx.attr._go_stdlib[GoStdLib]._list_json
-        stdlib_cache_dir = ctx.attr._go_stdlib[GoStdLib].cache_dir
+        stdlib = ctx.attr._go_stdlib[GoStdLib]
+        stdlib_json_file = stdlib._list_json
+        stdlib_cache_dir = stdlib.cache_dir
+        stdlib_srcs = stdlib._srcs
+
+    pkg_json_files = depset(
+        direct = pkg_json_files,
+        transitive = transitive_json_files,
+    )
+    compiled_go_files = depset(
+        direct = compiled_go_files,
+        transitive = transitive_compiled_go_files,
+    )
+    export_files = depset(
+        direct = export_files,
+        transitive = transitive_export_files,
+    )
+
+    driver_inputs = depset()
+    driver_env = {}
+    if GoArchive in target:
+        pkg_json_list = _write_pkg_json_list(ctx, pkg_json_files, stdlib_json_file)
+        driver = ctx.executable._gopackagesdriver
+        driver_inputs = depset(
+            direct = [pkg_json_list, stdlib_json_file, driver],
+            transitive = [
+                pkg_json_files,
+                compiled_go_files,
+                export_files,
+                stdlib_cache_dir or depset(),
+                # Needed to type-check the standard library from source,
+                # which go/packages does unless export_stdlib is set.
+                stdlib_srcs,
+            ],
+        )
+        mode = target[GoArchive].source.mode
+        driver_env = {
+            "GOPACKAGESDRIVER": driver.path,
+            "GOPACKAGESDRIVER_PKG_JSON_LIST": pkg_json_list.path,
+            # The driver filters source files for the target platform and tags.
+            "GOOS": mode.goos,
+            "GOARCH": mode.goarch,
+            "GOTAGS": ",".join(mode.tags),
+            "CGO_ENABLED": "0" if mode.pure else "1",
+        }
 
     pkg_info = GoPkgInfo(
         stdlib_json_file = stdlib_json_file,
         stdlib_cache_dir = stdlib_cache_dir,
-        pkg_json_files = depset(
-            direct = pkg_json_files,
-            transitive = transitive_json_files,
-        ),
-        compiled_go_files = depset(
-            direct = compiled_go_files,
-            transitive = transitive_compiled_go_files,
-        ),
-        export_files = depset(
-            direct = export_files,
-            transitive = transitive_export_files,
-        ),
+        stdlib_srcs = stdlib_srcs,
+        pkg_json_files = pkg_json_files,
+        compiled_go_files = compiled_go_files,
+        export_files = export_files,
+        driver_inputs = driver_inputs,
+        driver_env = driver_env,
     )
 
     return [
@@ -150,6 +206,11 @@ go_pkg_info_aspect = aspect(
     attrs = {
         "_go_stdlib": attr.label(
             default = "//:stdlib",
+        ),
+        "_gopackagesdriver": attr.label(
+            executable = True,
+            cfg = "exec",
+            default = Label("//go/tools/gopackagesdriver:reset_gopackagesdriver"),
         ),
         "_pkgjson": attr.label(
             executable = True,
