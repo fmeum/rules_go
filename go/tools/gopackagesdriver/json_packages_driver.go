@@ -65,6 +65,8 @@ func (b *JSONPackagesDriver) GetResponseFromIDs(ids []string) *packages.DriverRe
 
 	return &packages.DriverResponse{
 		NotHandled: false,
+		Compiler:   buildContext.Compiler,
+		Arch:       buildContext.GOARCH,
 		Roots:      rootPkgs,
 		Packages:   paks,
 	}

@@ -343,6 +343,16 @@ need to configure them:
   `GOOS`, `GOARCH` and `GOTAGS` of the driver's environment, so set them in the
   action when targeting another platform.
 
+  The list must contain the transitive `GoPkgInfo.pkg_json_files` and the
+  `GoPkgInfo.stdlib_json_file`. Declare these JSON files, the list itself,
+  `GoPkgInfo.compiled_go_files`, `GoPkgInfo.export_files`, and
+  `GoPkgInfo.stdlib_cache_dir` (when present) as action inputs. Also declare
+  the matching Go SDK's sources (for example, `@go_sdk//:srcs`, using your
+  SDK repository's name). The aspect's source output does not include SDK
+  sources; without them, loading standard-library types with the default
+  `export_stdlib = False`, or requesting dependency syntax, can fail inside
+  a sandbox even though it works from an unsandboxed execution root.
+
 ## Debugging
 It is possible to debug driver issues by calling it directly and looking at the errors
 in the outputs:

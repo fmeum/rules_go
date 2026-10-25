@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"go/types"
 	"os"
 	"path/filepath"
 	"testing"
@@ -69,6 +70,62 @@ func TestRunFromPkgJSON(t *testing.T) {
 	}
 	if findPackageByID(resp.Packages, "//offline/dep:dep") == nil {
 		t.Fatalf("dep missing from packages: %+v", resp.Packages)
+	}
+}
+
+func TestRunFromPkgJSONTargetSizes(t *testing.T) {
+	dir := t.TempDir()
+	pkgPath := filepath.Join(dir, "lib.pkg.json")
+	writePkgJSON(t, pkgPath, FlatPackage{
+		ID:      "//lib:lib",
+		Name:    "lib",
+		PkgPath: "example.com/lib",
+	})
+	listPath := filepath.Join(dir, "list")
+	if err := os.WriteFile(listPath, []byte(pkgPath+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	oldBuildContext := buildContext
+	t.Cleanup(func() { buildContext = oldBuildContext })
+
+	for _, tc := range []struct {
+		arch     string
+		wordSize int64
+	}{
+		{arch: "386", wordSize: 4},
+		{arch: "amd64", wordSize: 8},
+		{arch: "arm64", wordSize: 8},
+	} {
+		t.Run(tc.arch, func(t *testing.T) {
+			targetContext := *oldBuildContext
+			targetContext.Compiler = "gc"
+			targetContext.GOARCH = tc.arch
+			buildContext = &targetContext
+
+			var out bytes.Buffer
+			request := &packages.DriverRequest{Mode: packages.NeedTypesSizes}
+			if err := runFromPkgJSON(listPath, request, []string{"example.com/lib"}, &out); err != nil {
+				t.Fatal(err)
+			}
+			var resp packages.DriverResponse
+			if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+				t.Fatal(err)
+			}
+
+			if resp.Arch != tc.arch {
+				t.Errorf("Arch = %q, want %q", resp.Arch, tc.arch)
+			}
+			// go/packages uses these fields to size types when loading a package.
+			// Missing fields cause it to fall back to the client's architecture.
+			sizes := types.SizesFor(resp.Compiler, resp.Arch)
+			if sizes == nil {
+				t.Fatalf("no type sizes for Compiler=%q, Arch=%q", resp.Compiler, resp.Arch)
+			}
+			if got := sizes.Sizeof(types.Typ[types.Int]); got != tc.wordSize {
+				t.Errorf("sizeof(int) = %d, want %d for %s", got, tc.wordSize, tc.arch)
+			}
+		})
 	}
 }
 
