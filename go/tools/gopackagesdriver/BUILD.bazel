@@ -35,7 +35,7 @@ go_binary(
     },
 )
 
-# Used by go_pkg_info_aspect so that rules can run the driver in actions.
+# Used by go_pkg_driver_aspect so that rules can run the driver in actions.
 go_reset_target(
     name = "reset_gopackagesdriver",
     dep = ":gopackagesdriver",

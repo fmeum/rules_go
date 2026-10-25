@@ -341,22 +341,22 @@ need to configure them:
 
 ## Running go/packages tools in actions
 Tools built on `golang.org/x/tools/go/packages`, such as code generators or
-linters, can run inside an action of the same build. Apply
-`go_pkg_info_aspect` to the Go targets the tool should load and pass the
-`driver_inputs` and `driver_env` of their `GoPkgInfo` to the action:
+linters, can run inside an action of the same build. Attach
+`go_pkg_driver_aspect` to the attribute of the Go targets the tool should load
+and pass the `inputs` and `env` of their `GoPkgDriverInfo` to the action:
 
 ```starlark
 load("@io_bazel_rules_go//go:def.bzl", "GoArchive")
-load("@io_bazel_rules_go//go/tools/gopackagesdriver:aspect.bzl", "GoPkgInfo", "go_pkg_info_aspect")
+load("@io_bazel_rules_go//go/tools/gopackagesdriver:aspect.bzl", "GoPkgDriverInfo", "go_pkg_driver_aspect")
 
 def _my_rule_impl(ctx):
-    pkg_info = ctx.attr.dep[GoPkgInfo]
+    driver_info = ctx.attr.dep[GoPkgDriverInfo]
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
     ctx.actions.run(
         executable = ctx.executable._tool,
         arguments = [ctx.attr.dep[GoArchive].data.importpath, out.path],
-        inputs = pkg_info.driver_inputs,
-        env = pkg_info.driver_env,
+        inputs = driver_info.inputs,
+        env = driver_info.env,
         outputs = [out],
     )
     return [DefaultInfo(files = depset([out]))]
@@ -364,20 +364,20 @@ def _my_rule_impl(ctx):
 my_rule = rule(
     implementation = _my_rule_impl,
     attrs = {
-        "dep": attr.label(providers = [GoArchive], aspects = [go_pkg_info_aspect]),
+        "dep": attr.label(providers = [GoArchive], aspects = [go_pkg_driver_aspect]),
         "_tool": attr.label(default = "//my/tool", executable = True, cfg = "exec"),
     },
 )
 ```
 
-`driver_env` points `GOPACKAGESDRIVER` at the driver and sets `GOOS`, `GOARCH`,
-`GOTAGS` and `CGO_ENABLED` to the target's configuration. `driver_inputs`
-contains the driver and everything it needs to describe the target, its
-transitive dependencies and the standard library, including the Go SDK sources
-needed to type-check the standard library from source. The tool must run with
-the execution root as its working directory and can only query packages by
-import path (optionally ending in `/...`). See
-[tests/core/go_pkg_info_aspect](../tests/core/go_pkg_info_aspect) for a
+`env` points `GOPACKAGESDRIVER` at the driver and sets `GOOS`, `GOARCH`,
+`GOTAGS` and `CGO_ENABLED` to the target's configuration. `inputs` contains the
+driver and everything it needs to describe the target, its transitive
+dependencies and the standard library, including the Go SDK sources needed to
+type-check the standard library from source. The tool must run with the
+execution root as its working directory and can only query packages by import
+path (optionally ending in `/...`). See
+[tests/core/go_pkg_driver_aspect](../tests/core/go_pkg_driver_aspect) for a
 complete example.
 
 ## Debugging
