@@ -1,0 +1,48 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+load(":defs.bzl", "go_stringer")
+
+go_binary(
+    name = "stringer",
+    srcs = ["stringer.go"],
+    deps = ["@org_golang_x_tools//go/packages"],
+)
+
+go_library(
+    name = "palette",
+    srcs = ["palette.go"],
+    importpath = "example.com/palette",
+)
+
+# The declarations that go_stringer generates code for. The generated method
+# has to be in the same package, so it is compiled into :color, not into this
+# library.
+go_library(
+    name = "color_decls",
+    srcs = ["color.go"],
+    importpath = "example.com/color",
+    deps = [":palette"],
+)
+
+go_stringer(
+    name = "color_string",
+    out = "color_string.go",
+    dep = ":color_decls",
+    linecomment = True,
+    type = "Color",
+)
+
+go_library(
+    name = "color",
+    srcs = [
+        "color.go",
+        "color_string.go",
+    ],
+    importpath = "example.com/color",
+    deps = [":palette"],
+)
+
+go_test(
+    name = "color_test",
+    srcs = ["color_test.go"],
+    embed = [":color"],
+)

@@ -377,8 +377,9 @@ dependencies and the standard library, including the Go SDK sources needed to
 type-check the standard library from source. The tool must run with the
 execution root as its working directory and can only query packages by import
 path (optionally ending in `/...`). See
-[tests/core/go_pkg_driver_aspect](../tests/core/go_pkg_driver_aspect) for a
-complete example.
+[tests/core/go_pkg_driver_aspect/stringer](../tests/core/go_pkg_driver_aspect/stringer)
+for a complete example that generates code with a go/packages-based tool and
+compiles it in the same build.
 
 ## Debugging
 It is possible to debug driver issues by calling it directly and looking at the errors
