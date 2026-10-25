@@ -1,5 +1,6 @@
 load("//go:def.bzl", "go_binary", "go_library", "go_test")
 load("//go/private:common.bzl", "RULES_GO_REPO_NAME")
+load("//go/private/rules:transition.bzl", "go_reset_target")
 load("//go/tools/bazel_testing:def.bzl", "go_bazel_test")
 
 go_library(
@@ -32,6 +33,13 @@ go_binary(
         # both to specify the aspect and to match labels in query output.
         "rulesGoRepositoryName": RULES_GO_REPO_NAME,
     },
+)
+
+# Used by go_pkg_driver_aspect so that rules can run the driver in actions.
+go_reset_target(
+    name = "reset_gopackagesdriver",
+    dep = ":gopackagesdriver",
+    visibility = ["//visibility:public"],
 )
 
 go_test(

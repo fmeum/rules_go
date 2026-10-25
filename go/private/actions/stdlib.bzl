@@ -162,4 +162,7 @@ def _build_stdlib(go):
         libs = depset([pkg]),
         cache_dir = depset([cache_dir]),
         root_file = pkg,
+        # Sources of the SDK described by _list_json, which tools need to
+        # type-check the standard library from source.
+        _srcs = go.sdk.srcs,
     )

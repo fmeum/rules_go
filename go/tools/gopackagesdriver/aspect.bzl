@@ -158,3 +158,81 @@ go_pkg_info_aspect = aspect(
         ),
     },
 )
+
+GoPkgDriverInfo = provider(
+    doc = """Inputs and environment to load a Go target with gopackagesdriver in an action.
+
+    Provided by go_pkg_driver_aspect.
+    """,
+    fields = {
+        "env": """dict of environment variables for the action. GOPACKAGESDRIVER points
+            at the driver, which answers queries for import paths in the target's
+            transitive dependencies without invoking Bazel. GOOS, GOARCH, GOTAGS and
+            CGO_ENABLED match the target's configuration.""",
+        "inputs": "depset of all files the driver needs, including the driver itself.",
+    },
+)
+
+def _go_pkg_driver_aspect_impl(target, ctx):
+    if GoArchive not in target:
+        return []
+
+    # go_pkg_info_aspect provides the transitive information, this aspect only
+    # adds the actions specific to the targets it is attached to.
+    pkg_info = target[GoPkgInfo]
+    stdlib = ctx.attr._go_stdlib[GoStdLib]
+
+    pkg_json_list = ctx.actions.declare_file(ctx.label.name + ".pkg_json_list")
+    args = ctx.actions.args()
+    args.set_param_file_format("multiline")
+    args.add_all(pkg_info.pkg_json_files)
+    args.add(stdlib._list_json)
+    ctx.actions.write(pkg_json_list, args)
+
+    driver = ctx.executable._gopackagesdriver
+    mode = target[GoArchive].source.mode
+    return [GoPkgDriverInfo(
+        inputs = depset(
+            direct = [pkg_json_list, stdlib._list_json, driver],
+            transitive = [
+                pkg_info.pkg_json_files,
+                pkg_info.compiled_go_files,
+                pkg_info.export_files,
+                stdlib.cache_dir,
+                # Needed to type-check the standard library from source, which
+                # go/packages does unless export_stdlib is set.
+                stdlib._srcs,
+            ],
+        ),
+        env = {
+            "GOPACKAGESDRIVER": driver.path,
+            "GOPACKAGESDRIVER_PKG_JSON_LIST": pkg_json_list.path,
+            # The driver filters source files for the target platform and tags.
+            "GOOS": mode.goos,
+            "GOARCH": mode.goarch,
+            "GOTAGS": ",".join(mode.tags),
+            "CGO_ENABLED": "0" if mode.pure else "1",
+        },
+    )]
+
+go_pkg_driver_aspect = aspect(
+    implementation = _go_pkg_driver_aspect_impl,
+    doc = """Lets a rule run a go/packages-based tool on a Go target in an action.
+
+    Attach this aspect to an attribute of the rule and pass the inputs and env of
+    the target's GoPkgDriverInfo to the action. Unlike go_pkg_info_aspect, which
+    it requires, it does not propagate, so it only adds actions to the targets it
+    is attached to.
+    """,
+    requires = [go_pkg_info_aspect],
+    attrs = {
+        "_go_stdlib": attr.label(
+            default = "//:stdlib",
+        ),
+        "_gopackagesdriver": attr.label(
+            executable = True,
+            cfg = "exec",
+            default = Label("//go/tools/gopackagesdriver:reset_gopackagesdriver"),
+        ),
+    },
+)
